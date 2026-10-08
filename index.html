@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>高雄市115年路口科技執法監測系統設置地點地圖</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <!-- Google Fonts: Inter & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    /* 自訂 Leaflet Popup 樣式優化 */
+    .leaflet-popup-content-wrapper {
+      padding: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    }
+    .leaflet-popup-content {
+      margin: 0 !important;
+      line-height: 1.5;
+    }
+    .leaflet-container a.leaflet-popup-close-button {
+      top: 8px;
+      right: 8px;
+      color: #ffffff;
+      padding: 4px;
+      font-weight: 700;
+    }
+    /* 滾動條美化 */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 flex flex-col h-screen overflow-hidden">
+
+  <!-- 頂部導航列 -->
+  <header class="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white px-4 py-3 shadow-md z-30 flex items-center justify-between shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="bg-blue-600/30 p-2 rounded-xl border border-blue-500/30 flex items-center justify-center">
+        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base md:text-lg font-bold tracking-tight">高雄市115年路口科技執法監測地圖</h1>
+          <span class="hidden sm:inline-block px-2 py-0.5 text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-400/30 rounded-full">官方核定路段</span>
+        </div>
+        <p class="text-xs text-slate-400 hidden sm:block">即時查詢取締項目、測照行向、GPS座標與導航資訊</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-2">
+      <div class="bg-slate-800/80 border border-slate-700/80 px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-slate-300">總點位：</span>
+        <strong id="total-count" class="text-white text-sm font-bold">91</strong>
+        <span class="text-slate-400 text-xs">處</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主體區域：側邊欄 + 地圖 -->
+  <main class="flex-1 flex relative overflow-hidden">
+    
+    <!-- 側邊欄面板 -->
+    <aside id="sidebar" class="absolute md:relative z-20 w-full md:w-[410px] lg:w-[440px] h-[75vh] md:h-full bottom-0 md:bottom-auto bg-white border-t md:border-t-0 md:border-r border-slate-200 shadow-2xl md:shadow-none flex flex-col transition-transform duration-300 transform translate-y-full md:translate-y-0 rounded-t-2xl md:rounded-none">
+      
+      <!-- 手機端拉把手 -->
+      <div class="w-full flex justify-center py-2 md:hidden">
+        <div class="w-12 h-1.5 bg-slate-300 rounded-full"></div>
+      </div>
+
+      <!-- 搜尋與過濾控制器 -->
+      <div class="p-3 md:p-4 border-b border-slate-200 bg-white space-y-3 shrink-0">
+        <!-- 搜尋列 -->
+        <div class="relative">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          <input type="text" id="search-input" placeholder="搜尋路名、路口、取締項目、行向..." class="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+        </div>
+
+        <!-- 篩選列 -->
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <select id="district-filter" class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700 cursor-pointer">
+              <option value="ALL">全高雄市 (全區)</option>
+            </select>
+          </div>
+          <div>
+            <select id="feature-filter" class="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium text-slate-700 cursor-pointer">
+              <option value="ALL">所有功能標記</option>
+              <option value="SPEED">⚡ 具取締超速功能</option>
+              <option value="NAME_CHANGE">ℹ️ 變更路名</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 結果統計 -->
+        <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+          <span>篩選結果：<strong id="filtered-count" class="text-blue-600 font-bold">0</strong> 處路口</span>
+          <span class="text-slate-400">點選卡片聚焦標記</span>
+        </div>
+      </div>
+
+      <!-- 點位列表清單 -->
+      <div id="items-list" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-slate-50">
+        <!-- 卡片由 JavaScript 動態渲染 -->
+      </div>
+    </aside>
+
+    <!-- 地圖主容器 -->
+    <div id="map" class="flex-1 h-full w-full z-10"></div>
+
+    <!-- 手機端浮動按鈕：展開/收合清單 -->
+    <button id="mobile-toggle-btn" class="md:hidden absolute bottom-5 right-5 z-30 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-2.5 rounded-full shadow-lg font-medium text-sm transition-transform active:scale-95">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+      </svg>
+      <span>展開清單 (<span id="mobile-badge-count">91</span>)</span>
+    </button>
+  </main>
+
+  <!-- Leaflet & MarkerCluster JS CDN -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <script>
+    // 嚴格對應提供之 CSV 檔，共 91 筆真實記錄，杜絕虛擬造假資料
+    const enforcementData = [
+      {"seq": 1, "id": 1, "district": "左營區", "location": "左營區大中二路/華夏路", "violation": "路口各項違規(闖紅燈、騎乘人行道、逆向、違規迴轉等)", "direction": "西向東", "lat": 22.683281, "lng": 120.307615, "note": ""},
+      {"seq": 2, "id": 2, "district": "左營區", "location": "左營區博愛二路/新庄仔路", "violation": "路口各項違規(闖紅燈、占用左轉專用車道、違規迴轉等)", "direction": "南向北", "lat": 22.669986, "lng": 120.303403, "note": ""},
+      {"seq": 3, "id": 3, "district": "鳳山區", "location": "鳳山區過埤路/鳳頂路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.5903729, "lng": 120.3593547, "note": ""},
+      {"seq": 4, "id": 4, "district": "前鎮區", "location": "前鎮區中山四路/中安、中平路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.580268, "lng": 120.329487, "note": ""},
+      {"seq": 5, "id": 5, "district": "前鎮區", "location": "前鎮區中山四路/中安、中平路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.580608, "lng": 120.328819, "note": ""},
+      {"seq": 6, "id": 6, "district": "大寮區", "location": "大寮區市道188號/鳳林二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.586404, "lng": 120.404609, "note": ""},
+      {"seq": 7, "id": 7, "district": "前鎮區", "location": "前鎮區新生路/金福路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.567458, "lng": 120.323745, "note": ""},
+      {"seq": 8, "id": 8, "district": "小港區", "location": "小港區沿海二路/永光街", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.54958, "lng": 120.366042, "note": ""},
+      {"seq": 9, "id": 9, "district": "小港區", "location": "小港區沿海二路/世全路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.545891, "lng": 120.368636, "note": ""},
+      {"seq": 10, "id": 10, "district": "前鎮區", "location": "前鎮區中華五路/復興二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.606278, "lng": 120.304847, "note": ""},
+      {"seq": 11, "id": 11, "district": "楠梓區", "location": "楠梓區鳳楠路/興西路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.72169, "lng": 120.331767, "note": ""},
+      {"seq": 12, "id": 12, "district": "楠梓區", "location": "楠梓區鳳楠路/興西路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.720918, "lng": 120.33255, "note": ""},
+      {"seq": 13, "id": 13, "district": "苓雅區", "location": "苓雅區中正一路/大順三路/河南路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.62992523, "lng": 120.322668, "note": ""},
+      {"seq": 14, "id": 14, "district": "苓雅區", "location": "苓雅區中正一路/高速公路西側", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.628137, "lng": 120.335862, "note": ""},
+      {"seq": 15, "id": 15, "district": "苓雅區", "location": "苓雅區凱旋二、三路/三多二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.620333, "lng": 120.325365, "note": ""},
+      {"seq": 16, "id": 16, "district": "左營區", "location": "左營區翠華路/勝利路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.67598457, "lng": 120.294816, "note": ""},
+      {"seq": 17, "id": 17, "district": "岡山區", "location": "岡山區嘉新西路/岡山路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.801878, "lng": 120.292603, "note": ""},
+      {"seq": 18, "id": 18, "district": "小港區", "location": "小港區中山四路/平和東路", "violation": "路口各項違規(闖紅燈、超速、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.570253, "lng": 120.33743, "note": "有取締超速功能"},
+      {"seq": 19, "id": 19, "district": "鳳山區", "location": "鳳山區鳳頂路/過埤路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.5902688, "lng": 120.3583329, "note": ""},
+      {"seq": 20, "id": 20, "district": "鼓山區", "location": "鼓山區馬卡道路/青海路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.651901, "lng": 120.281844, "note": ""},
+      {"seq": 21, "id": 21, "district": "前鎮區", "location": "前鎮區中山四路/鎮海路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.593062, "lng": 120.318328, "note": ""},
+      {"seq": 22, "id": 22, "district": "三民區", "location": "三民區民族一路/建工路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.647351, "lng": 120.31487, "note": ""},
+      {"seq": 23, "id": 23, "district": "前鎮區", "location": "前鎮區中山三路/光華三路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.60145, "lng": 120.311799, "note": ""},
+      {"seq": 24, "id": 24, "district": "三民區", "location": "三民區博愛一路/九如二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.6416392, "lng": 120.3026007, "note": ""},
+      {"seq": 25, "id": 25, "district": "三民區", "location": "三民區中山一路/建國二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.6372888, "lng": 120.302544, "note": ""},
+      {"seq": 26, "id": 26, "district": "鼓山區", "location": "鼓山區北斗街/輕軌路口", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.632724, "lng": 120.282461, "note": "變更路名"},
+      {"seq": 27, "id": 27, "district": "鼓山區", "location": "鼓山區北斗街/輕軌路口", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.632336, "lng": 120.2831, "note": "變更路名"},
+      {"seq": 28, "id": 28, "district": "鼓山區", "location": "鼓山區五福四路/輕軌路口", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.626317, "lng": 120.2781, "note": "變更路名"},
+      {"seq": 29, "id": 29, "district": "鼓山區", "location": "鼓山區華安街/馬卡道路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向西", "lat": 22.64722, "lng": 120.281511, "note": ""},
+      {"seq": 30, "id": 30, "district": "鼓山區", "location": "鼓山區華安街/馬卡道路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向西", "lat": 22.647827, "lng": 120.281554, "note": ""},
+      {"seq": 31, "id": 31, "district": "鼓山區", "location": "鼓山區華安街/馬卡道路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.647496, "lng": 120.282049, "note": ""},
+      {"seq": 32, "id": 32, "district": "鼓山區", "location": "鼓山區大公路/鼓山一路", "violation": "路口各項違規(不依標誌標線號誌行駛等)", "direction": "南向東", "lat": 22.629167, "lng": 120.280139, "note": ""},
+      {"seq": 33, "id": 33, "district": "苓雅區", "location": "苓雅區凱旋二路/四維二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向東", "lat": 22.623667, "lng": 120.324111, "note": ""},
+      {"seq": 34, "id": 34, "district": "苓雅區", "location": "苓雅區凱旋二路/四維二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.623861, "lng": 120.323806, "note": ""},
+      {"seq": 35, "id": 35, "district": "苓雅區", "location": "苓雅區凱旋二路/四維二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向東", "lat": 22.624111, "lng": 120.323833, "note": ""},
+      {"seq": 36, "id": 36, "district": "苓雅區", "location": "苓雅區凱旋二路/四維二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向西", "lat": 22.624167, "lng": 120.324167, "note": ""},
+      {"seq": 37, "id": 37, "district": "苓雅區", "location": "苓雅區凱旋三路/武昌路", "violation": "路口各項違規(不依標誌標線號誌行駛等)", "direction": "南向東", "lat": 22.616886, "lng": 120.326704, "note": ""},
+      {"seq": 38, "id": 38, "district": "苓雅區", "location": "苓雅區凱旋三路/武昌路", "violation": "路口各項違規(不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.617119, "lng": 120.326263, "note": ""},
+      {"seq": 39, "id": 39, "district": "苓雅區", "location": "苓雅區凱旋三路/武昌路", "violation": "路口各項違規(不依標誌標線號誌行駛等)", "direction": "北向東", "lat": 22.617591, "lng": 120.326438, "note": ""},
+      {"seq": 40, "id": 40, "district": "苓雅區", "location": "苓雅區凱旋三路/武昌路", "violation": "路口各項違規(不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.6174315, "lng": 120.3270631, "note": ""},
+      {"seq": 41, "id": 41, "district": "前鎮區", "location": "前鎮區凱旋四路/中山三路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向南", "lat": 22.596389, "lng": 120.316111, "note": ""},
+      {"seq": 42, "id": 42, "district": "前鎮區", "location": "前鎮區凱旋四路/中山三路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向南", "lat": 22.595556, "lng": 120.315556, "note": ""},
+      {"seq": 43, "id": 43, "district": "苓雅區", "location": "苓雅區凱旋三路/二聖一路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向東", "lat": 22.611389, "lng": 120.326667, "note": ""},
+      {"seq": 44, "id": 44, "district": "苓雅區", "location": "苓雅區凱旋三路/二聖一路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向東", "lat": 22.612111, "lng": 120.3265375, "note": ""},
+      {"seq": 45, "id": 45, "district": "苓雅區", "location": "苓雅區凱旋三路/二聖一路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.611944, "lng": 120.327222, "note": ""},
+      {"seq": 46, "id": 46, "district": "前鎮區", "location": "前鎮區凱旋四路/鎮興路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向南", "lat": 22.593807, "lng": 120.3105, "note": ""},
+      {"seq": 47, "id": 47, "district": "前鎮區", "location": "前鎮區凱旋四路/前鎮街", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向南", "lat": 22.592826, "lng": 120.3074, "note": ""},
+      {"seq": 48, "id": 48, "district": "鳳山區", "location": "鳳山區鳳松路/經武路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.6422046, "lng": 120.3638002, "note": ""},
+      {"seq": 49, "id": 49, "district": "三民區", "location": "三民區大中一路/鼎中路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.6766113, "lng": 120.3236706, "note": ""},
+      {"seq": 50, "id": 50, "district": "鳳山區", "location": "鳳山區五甲一路/凱旋路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.6119053, "lng": 120.3502258, "note": ""},
+      {"seq": 51, "id": 51, "district": "前金區", "location": "前金區中山一路/民生一路、民生二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.62667647, "lng": 120.3015335, "note": ""},
+      {"seq": 52, "id": 52, "district": "苓雅區", "location": "苓雅區武營路/三多一路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.6244916, "lng": 120.3357465, "note": ""},
+      {"seq": 53, "id": 53, "district": "楠梓區", "location": "楠梓區加昌路/海專路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.723064, "lng": 120.317578, "note": ""},
+      {"seq": 54, "id": 54, "district": "楠梓區", "location": "楠梓區後昌路/左楠路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.708018, "lng": 120.303021, "note": ""},
+      {"seq": 55, "id": 55, "district": "楠梓區", "location": "楠梓區楠陽路/鳳楠路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.723865, "lng": 120.329811, "note": ""},
+      {"seq": 56, "id": 56, "district": "大寮區", "location": "大寮區市道188號(內坑路)與高72線路口", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.589227, "lng": 120.384388, "note": ""},
+      {"seq": 57, "id": 57, "district": "林園區", "location": "林園區沿海路四段/王公路/東林西路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.50333, "lng": 120.3820631, "note": ""},
+      {"seq": 58, "id": 58, "district": "前鎮區", "location": "前鎮區中安路/明鳳五街路", "violation": "路口各項違規(闖紅燈、禁止迴轉、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.582961, "lng": 120.334838, "note": ""},
+      {"seq": 59, "id": 59, "district": "左營區", "location": "左營區翠華路/大中二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.686497, "lng": 120.302663, "note": ""},
+      {"seq": 60, "id": 60, "district": "左營區", "location": "左營區翠華路/大中二路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.686165, "lng": 120.303088, "note": ""},
+      {"seq": 61, "id": 61, "district": "仁武區", "location": "仁武區高楠公路/八德二路", "violation": "路口各項違規(不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.7009717, "lng": 120.3235253, "note": ""},
+      {"seq": 62, "id": 62, "district": "前金區", "location": "前金區中華三路/五褔三路", "violation": "路口各項違規(闖紅燈、車不停讓行人、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.622952, "lng": 120.298297, "note": ""},
+      {"seq": 63, "id": 63, "district": "前金區", "location": "前金區中華三路/五褔三路", "violation": "路口各項違規(闖紅燈、車不停讓行人、不依標誌標線號誌行駛等)", "direction": "東向北", "lat": 22.622865, "lng": 120.298588, "note": ""},
+      {"seq": 64, "id": 64, "district": "前鎮區", "location": "前鎮區中山四路/五甲三路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.588267, "lng": 120.322763, "note": ""},
+      {"seq": 65, "id": 65, "district": "左營區", "location": "左營區民族一路/大中二路", "violation": "路口各項違規(闖紅燈、超速、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.679394, "lng": 120.319061, "note": "有取締超速功能"},
+      {"seq": 66, "id": 66, "district": "楠梓區", "location": "楠梓區高楠公路/水管路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.707125, "lng": 120.324463, "note": ""},
+      {"seq": 67, "id": 67, "district": "苓雅區", "location": "苓雅區建國一路/高速公路東側便道", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.630357, "lng": 120.336487, "note": ""},
+      {"seq": 68, "id": 68, "district": "仁武區", "location": "仁武區澄觀路二段/水管路三段", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.704041, "lng": 120.359794, "note": ""},
+      {"seq": 69, "id": 69, "district": "苓雅區", "location": "苓雅區中正一路/輔仁路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.628069, "lng": 120.331792, "note": ""},
+      {"seq": 70, "id": 70, "district": "苓雅區", "location": "苓雅區中正一路/高速公路東側便道", "violation": "路口各項違規(闖紅燈、汽車占用機慢車停等區、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.626658, "lng": 120.336323, "note": ""},
+      {"seq": 71, "id": 71, "district": "左營區", "location": "左營區華夏路/新莊一路", "violation": "路口各項違規(闖紅燈、車不停讓行人、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.672249, "lng": 120.297891, "note": ""},
+      {"seq": 72, "id": 72, "district": "左營區", "location": "左營區博愛二路/裕誠路", "violation": "路口各項違規(闖紅燈、車不停讓行人、汽車占用機慢車停等區、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.66617, "lng": 120.303184, "note": ""},
+      {"seq": 73, "id": 73, "district": "三民區", "location": "三民區九如一路/高速公路東側便道", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.637087, "lng": 120.337643, "note": ""},
+      {"seq": 74, "id": 74, "district": "左營區", "location": "左營區翠華路/新庄仔路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.679186, "lng": 120.297844, "note": ""},
+      {"seq": 75, "id": 75, "district": "三民區", "location": "三民區自由一路/同盟一路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.650524, "lng": 120.308939, "note": ""},
+      {"seq": 76, "id": 76, "district": "楠梓區", "location": "楠梓區德民路/海專路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.726436, "lng": 120.31014, "note": ""},
+      {"seq": 77, "id": 77, "district": "橋頭區", "location": "橋頭區成功北路/鐵道北路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.767154, "lng": 120.305743, "note": ""},
+      {"seq": 78, "id": 78, "district": "小港區", "location": "小港區南星路/沿海三路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.51025, "lng": 120.362139, "note": ""},
+      {"seq": 79, "id": 79, "district": "小港區", "location": "小港區南星路/丹山一路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "東向西", "lat": 22.509512, "lng": 120.359556, "note": ""},
+      {"seq": 80, "id": 80, "district": "小港區", "location": "小港區丹山一路/南星路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.509243, "lng": 120.35928, "note": ""},
+      {"seq": 81, "id": 81, "district": "鳳山區", "location": "鳳山區過埤路/過勇路", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "西向東", "lat": 22.589889, "lng": 120.362444, "note": ""},
+      {"seq": 82, "id": 82, "district": "林園區", "location": "林園區河堤路三段/工業一路口", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.51266, "lng": 120.412404, "note": ""},
+      {"seq": 83, "id": 83, "district": "林園區", "location": "林園區河堤路三段/工業一路口", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.513265, "lng": 120.412251, "note": ""},
+      {"seq": 84, "id": 84, "district": "大寮區", "location": "大寮區河堤路三段/華中南路口", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "南向北", "lat": 22.549579, "lng": 120.423285, "note": ""},
+      {"seq": 85, "id": 85, "district": "大寮區", "location": "大寮區河堤路三段/華中南路口", "violation": "路口各項違規(闖紅燈、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.550123, "lng": 120.423775, "note": ""},
+      {"seq": 86, "id": 86, "district": "大寮區", "location": "大寮區河堤路三段/光華路口", "violation": "路口各項違規(闖紅燈、逆向行駛、不依標誌標線號誌行駛等)", "direction": "北向南", "lat": 22.5833767, "lng": 120.4353012, "note": ""},
+      {"seq": 87, "id": 87, "district": "大寮區", "location": "大寮區河堤路三段/光華路口", "violation": "路口各項違規(超速)", "direction": "南向北", "lat": 22.5824107, "lng": 120.4349427, "note": "有取締超速功能"},
+      {"seq": 88, "id": 88, "district": "林園區", "location": "林園區沿海路四段/王公路、東林西路口", "violation": "闖紅燈、違規右轉", "direction": "東向西", "lat": 22.5032747, "lng": 120.3829518, "note": ""},
+      {"seq": 89, "id": 89, "district": "林園區", "location": "林園區王公路/沿海路四段口", "violation": "限制車種", "direction": "南向北", "lat": 22.5039531, "lng": 120.3828253, "note": ""},
+      {"seq": 90, "id": 90, "district": "林園區", "location": "林園區沿海路二段/文賢南路口", "violation": "闖紅燈、違規右轉、跨越雙白線", "direction": "東向西", "lat": 22.5003054, "lng": 120.393763, "note": ""},
+      {"seq": 91, "id": 91, "district": "林園區", "location": "林園區沿海路二段與鳳林路、中芸三路口", "violation": "闖紅燈、違規右轉", "direction": "西向東", "lat": 22.500598, "lng": 120.397479, "note": ""}
+    ];
+
+    const totalCountEl = document.getElementById('total-count');
+    const filteredCountEl = document.getElementById('filtered-count');
+    const mobileBadgeCountEl = document.getElementById('mobile-badge-count');
+    const itemsListEl = document.getElementById('items-list');
+    const searchInput = document.getElementById('search-input');
+    const districtFilter = document.getElementById('district-filter');
+    const featureFilter = document.getElementById('feature-filter');
+    const sidebarEl = document.getElementById('sidebar');
+    const mobileToggleBtn = document.getElementById('mobile-toggle-btn');
+
+    totalCountEl.textContent = enforcementData.length;
+    mobileBadgeCountEl.textContent = enforcementData.length;
+
+    // 初始化地圖中心於高雄市區
+    const map = L.map('map', {
+      center: [22.6314, 120.3129],
+      zoom: 12,
+      zoomControl: true
+    });
+
+    // 載入 OpenStreetMap 圖資
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 臺灣高雄路口科技執法'
+    }).addTo(map);
+
+    // 點位聚合組件
+    const markersCluster = L.markerClusterGroup({
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      zoomToBoundsOnClick: true,
+      maxClusterRadius: 42
+    });
+    map.addLayer(markersCluster);
+
+    const markerMap = new Map();
+
+    // 解析所有行政區清單
+    const districts = Array.from(new Set(enforcementData.map(d => d.district).filter(Boolean))).sort();
+    districts.forEach(dist => {
+      const opt = document.createElement('option');
+      opt.value = dist;
+      opt.textContent = `${dist} (${enforcementData.filter(d => d.district === dist).length})`;
+      districtFilter.appendChild(opt);
+    });
+
+    function createMarkerIcon(isSpeed) {
+      const bgColor = isSpeed ? '#ef4444' : '#2563eb';
+      const pulseHtml = isSpeed ? '<div class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full animate-ping"></div>' : '';
+
+      return L.divIcon({
+        className: 'bg-transparent',
+        html: `
+          <div class="relative w-8 h-8 flex items-center justify-center cursor-pointer">
+            <div style="background-color: ${bgColor};" class="w-6 h-6 rounded-full rounded-br-none -rotate-45 border-2 border-white shadow-md flex items-center justify-center transition-transform hover:scale-110">
+              <div class="w-2 h-2 bg-white rounded-full rotate-45"></div>
+            </div>
+            ${pulseHtml}
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 28],
+        popupAnchor: [0, -26]
+      });
+    }
+
+    function buildPopupHtml(item) {
+      const isSpeed = item.note && item.note.includes('超速');
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${item.lat},${item.lng}`;
+      
+      let noteBadge = '';
+      if (item.note) {
+        if (isSpeed) {
+          noteBadge = `<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">⚡ 有取締超速功能</span>`;
+        } else {
+          noteBadge = `<span class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">ℹ️ ${item.note}</span>`;
+        }
+      }
+
+      return `
+        <div class="w-72 bg-white">
+          <div class="bg-gradient-to-r from-blue-900 to-indigo-900 text-white p-3.5 flex justify-between items-center">
+            <div>
+              <span class="text-xs font-mono text-blue-200 uppercase tracking-wider block">編號 #${item.id}</span>
+              <h3 class="font-bold text-sm leading-tight text-white mt-0.5">${item.district}</h3>
+            </div>
+            <span class="text-xs font-semibold px-2 py-1 rounded bg-white/20 text-white border border-white/20 whitespace-nowrap">🧭 ${item.direction}</span>
+          </div>
+          <div class="p-3.5 space-y-2.5 text-xs text-slate-600">
+            <div>
+              <span class="font-bold text-slate-400 block mb-0.5 text-[11px]">設置位置</span>
+              <p class="font-bold text-slate-900 text-sm">${item.location}</p>
+              ${noteBadge ? `<div class="mt-1.5">${noteBadge}</div>` : ''}
+            </div>
+            <div>
+              <span class="font-bold text-slate-400 block mb-0.5 text-[11px]">取締項目</span>
+              <p class="text-slate-700 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">${item.violation}</p>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1 border-t border-slate-100">
+              <span>GPS: ${item.lat.toFixed(5)}, ${item.lng.toFixed(5)}</span>
+            </div>
+            <a href="${googleMapsUrl}" target="_blank" rel="noopener noreferrer" class="mt-2 block w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-center transition-colors shadow-sm">
+              🗺️ 開啟 Google 地圖導航
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMarkers(items) {
+      markersCluster.clearLayers();
+      markerMap.clear();
+
+      items.forEach(item => {
+        const isSpeed = item.note && item.note.includes('超速');
+        const marker = L.marker([item.lat, item.lng], {
+          icon: createMarkerIcon(isSpeed),
+          title: item.location
+        });
+
+        marker.bindPopup(buildPopupHtml(item));
+        marker.on('click', () => {
+          highlightCard(item.id);
+        });
+
+        markersCluster.addLayer(marker);
+        markerMap.set(item.id, marker);
+      });
+    }
+
+    function renderList(items) {
+      filteredCountEl.textContent = items.length;
+      mobileBadgeCountEl.textContent = items.length;
+      itemsListEl.innerHTML = '';
+
+      if (items.length === 0) {
+        itemsListEl.innerHTML = `
+          <div class="text-center py-12 px-4 text-slate-400 space-y-2">
+            <svg class="w-8 h-8 mx-auto text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-sm font-medium text-slate-600">無符合條件的路口點位</p>
+            <p class="text-xs text-slate-400">請嘗試更換行政區或縮短關鍵字</p>
+          </div>
+        `;
+        return;
+      }
+
+      items.forEach(item => {
+        const isSpeed = item.note && item.note.includes('超速');
+        const card = document.createElement('div');
+        card.id = `card-${item.id}`;
+        card.className = 'group p-3 bg-white hover:bg-blue-50/50 border border-slate-200 hover:border-blue-400 rounded-xl cursor-pointer transition-all duration-200 shadow-sm hover:shadow';
+
+        let badgeTag = '';
+        if (item.note) {
+          if (isSpeed) {
+            badgeTag = `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">⚡ 取締超速</span>`;
+          } else {
+            badgeTag = `<span class="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">ℹ️ ${item.note}</span>`;
+          }
+        }
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2 mb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs font-mono font-bold bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-blue-700 px-1.5 py-0.5 rounded">#${item.id}</span>
+              <h4 class="font-bold text-xs text-slate-900 leading-snug group-hover:text-blue-600 transition-colors">${item.location}</h4>
+            </div>
+            <span class="text-[11px] font-medium px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded border border-indigo-100 shrink-0">🧭 ${item.direction}</span>
+          </div>
+          <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed mb-2">${item.violation}</p>
+          <div class="flex items-center justify-between pt-1.5 border-t border-slate-100">
+            <span class="text-[10px] font-mono text-slate-400">${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}</span>
+            ${badgeTag}
+          </div>
+        `;
+
+        card.addEventListener('click', () => {
+          selectAndFocusItem(item);
+        });
+
+        itemsListEl.appendChild(card);
+      });
+    }
+
+    function selectAndFocusItem(item) {
+      highlightCard(item.id);
+      const marker = markerMap.get(item.id);
+
+      if (marker) {
+        markersCluster.zoomToShowLayer(marker, () => {
+          marker.openPopup();
+        });
+      }
+
+      // 若在行動端，收合側邊抽屜以呈現地圖
+      if (window.innerWidth < 768) {
+        sidebarEl.classList.add('translate-y-full');
+        mobileToggleBtn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+          <span>展開清單 (${filteredCountEl.textContent})</span>
+        `;
+      }
+    }
+
+    function highlightCard(id) {
+      document.querySelectorAll('#items-list > div').forEach(c => {
+        c.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50', 'border-transparent');
+      });
+      const activeCard = document.getElementById(`card-${id}`);
+      if (activeCard) {
+        activeCard.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50', 'border-transparent');
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function applyFilters() {
+      const keyword = searchInput.value.trim().toLowerCase();
+      const selectedDistrict = districtFilter.value;
+      const selectedFeature = featureFilter.value;
+
+      const filtered = enforcementData.filter(item => {
+        // 行政區過濾
+        if (selectedDistrict !== 'ALL' && item.district !== selectedDistrict) {
+          return false;
+        }
+
+        // 功能特徵過濾
+        if (selectedFeature === 'SPEED') {
+          if (!item.note || !item.note.includes('超速')) return false;
+        } else if (selectedFeature === 'NAME_CHANGE') {
+          if (!item.note || !item.note.includes('變更路名')) return false;
+        }
+
+        // 關鍵字搜尋
+        if (keyword) {
+          const matchLoc = item.location.toLowerCase().includes(keyword);
+          const matchVio = item.violation.toLowerCase().includes(keyword);
+          const matchDir = item.direction.toLowerCase().includes(keyword);
+          const matchNote = item.note.toLowerCase().includes(keyword);
+          const matchId = String(item.id) === keyword;
+          if (!matchLoc && !matchVio && !matchDir && !matchNote && !matchId) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+
+      renderMarkers(filtered);
+      renderList(filtered);
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    districtFilter.addEventListener('change', applyFilters);
+    featureFilter.addEventListener('change', applyFilters);
+
+    // 手機端抽屜切換
+    mobileToggleBtn.addEventListener('click', () => {
+      const isClosed = sidebarEl.classList.contains('translate-y-full');
+      if (isClosed) {
+        sidebarEl.classList.remove('translate-y-full');
+        mobileToggleBtn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          <span>收合地圖</span>
+        `;
+      } else {
+        sidebarEl.classList.add('translate-y-full');
+        mobileToggleBtn.innerHTML = `
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path></svg>
+          <span>展開清單 (${filteredCountEl.textContent})</span>
+        `;
+      }
+    });
+
+    // 初始渲染執行
+    renderMarkers(enforcementData);
+    renderList(enforcementData);
+  </script>
+</body>
+</html>
